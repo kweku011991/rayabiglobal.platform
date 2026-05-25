@@ -1,0 +1,172 @@
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+
+export const create = mutation({
+  args: {
+    sessionId: v.string(),
+    source: v.union(v.literal("request"), v.literal("direct")),
+    requestId: v.optional(v.id("productRequests")),
+    productId: v.optional(v.id("directProducts")),
+    productDetails: v.object({
+      name: v.string(),
+      description: v.string(),
+      price: v.number(),
+      shippingCost: v.number(),
+    }),
+    totalAmount: v.number(),
+  },
+  returns: v.id("orders"),
+  handler: async (ctx, args) => {
+    const orderId = await ctx.db.insert("orders", {
+      ...args,
+      paymentStatus: "paid", // simplified for mock
+      orderStatus: "ordered_from_supplier",
+      trackingUpdates: [
+        { status: "Order Confirmed", timestamp: Date.now() },
+        { status: "Ordered from supplier", timestamp: Date.now() },
+      ],
+      createdAt: Date.now(),
+    });
+
+    if (args.requestId) {
+      await ctx.db.patch(args.requestId, { status: "accepted" });
+    }
+
+    return orderId;
+  },
+});
+
+export const listByUser = query({
+  args: { sessionId: v.string() },
+  returns: v.array(
+    v.object({
+      _id: v.id("orders"),
+      _creationTime: v.number(),
+      sessionId: v.string(),
+      source: v.union(v.literal("request"), v.literal("direct")),
+      requestId: v.optional(v.id("productRequests")),
+      productId: v.optional(v.id("directProducts")),
+      productDetails: v.object({
+        name: v.string(),
+        description: v.string(),
+        price: v.number(),
+        shippingCost: v.number(),
+      }),
+      totalAmount: v.number(),
+      paymentStatus: v.union(v.literal("paid"), v.literal("pending")),
+      orderStatus: v.union(
+        v.literal("ordered_from_supplier"),
+        v.literal("shipped_to_ghana"),
+        v.literal("arrived_warehouse"),
+        v.literal("out_for_delivery"),
+        v.literal("delivered")
+      ),
+      trackingUpdates: v.array(
+        v.object({
+          status: v.string(),
+          timestamp: v.number(),
+        })
+      ),
+      createdAt: v.number(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("orders")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
+      .order("desc")
+      .collect();
+  },
+});
+
+export const listAll = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id("orders"),
+      _creationTime: v.number(),
+      sessionId: v.string(),
+      source: v.union(v.literal("request"), v.literal("direct")),
+      requestId: v.optional(v.id("productRequests")),
+      productId: v.optional(v.id("directProducts")),
+      productDetails: v.object({
+        name: v.string(),
+        description: v.string(),
+        price: v.number(),
+        shippingCost: v.number(),
+      }),
+      totalAmount: v.number(),
+      paymentStatus: v.union(v.literal("paid"), v.literal("pending")),
+      orderStatus: v.union(
+        v.literal("ordered_from_supplier"),
+        v.literal("shipped_to_ghana"),
+        v.literal("arrived_warehouse"),
+        v.literal("out_for_delivery"),
+        v.literal("delivered")
+      ),
+      trackingUpdates: v.array(
+        v.object({
+          status: v.string(),
+          timestamp: v.number(),
+        })
+      ),
+      createdAt: v.number(),
+    })
+  ),
+  handler: async (ctx) => {
+    return await ctx.db.query("orders").order("desc").collect();
+  },
+});
+
+export const updateStatus = mutation({
+  args: {
+    orderId: v.id("orders"),
+    status: v.union(
+      v.literal("ordered_from_supplier"),
+      v.literal("shipped_to_ghana"),
+      v.literal("arrived_warehouse"),
+      v.literal("out_for_delivery"),
+      v.literal("delivered")
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderId);
+    if (!order) throw new Error("Order not found");
+
+    const statusMap: Record<string, string> = {
+      ordered_from_supplier: "Ordered from supplier",
+      shipped_to_ghana: "Shipped to Ghana",
+      arrived_warehouse: "Arrived at warehouse",
+      out_for_delivery: "Out for delivery",
+      delivered: "Delivered",
+    };
+
+    const newUpdate = {
+      status: statusMap[args.status],
+      timestamp: Date.now(),
+    };
+
+    await ctx.db.patch(args.orderId, {
+      orderStatus: args.status,
+      trackingUpdates: [...order.trackingUpdates, newUpdate],
+    });
+    return null;
+  },
+});
+
+export const getStats = query({
+  args: {},
+  returns: v.object({
+    totalSales: v.number(),
+    orderCount: v.number(),
+  }),
+  handler: async (ctx) => {
+    const orders = await ctx.db.query("orders").collect();
+    const totalSales = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+    return {
+      totalSales,
+      orderCount: orders.length,
+    };
+  },
+});
