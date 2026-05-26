@@ -75,8 +75,8 @@ function LandingPage() {
               USA, UK, Dubai & China to Ghana
             </div>
             <h1 className="text-6xl md:text-8xl font-black tracking-tight leading-[0.9] mb-10 uppercase">
-              Luxury <br/>
-              <span className="text-[#9caf9c]">Mobility.</span>
+              Import <br/>
+              <span className="text-[#9caf9c]">Anything.</span>
             </h1>
             <p className="max-w-md text-lg text-[#1b2b1b]/70 mb-12 leading-relaxed font-medium">
               Import premium cars, motorbikes, e-bikes, and luxury accessories. We source, ship, and handle all protocols for you.
