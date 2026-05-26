@@ -6,6 +6,7 @@ import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState, useEffect } from "react";
 import { formatPrice } from "../lib/utils";
+import { Toast, ConfirmModal } from "../components/BrandedUI";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -15,6 +16,9 @@ function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [passcode, setPasscode] = useState("");
   const [showReport, setShowReport] = useState(false);
+  
+  // Branded UI States
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
     const auth = sessionStorage.getItem("admin_auth");
@@ -31,7 +35,7 @@ function AdminPage() {
       sessionStorage.setItem("admin_auth", "true");
       setIsAuthenticated(true);
     } else {
-      alert("Invalid Passcode");
+      setToast({ message: "Invalid Admin Credentials", type: "error" });
     }
   };
 
@@ -44,7 +48,9 @@ function AdminPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#1b2b1b] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#1b2b1b] flex items-center justify-center p-6 relative">
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        
         <div className="bg-white rounded-3xl p-12 max-w-sm w-full shadow-2xl text-center">
           <div className="w-20 h-20 bg-[#1b2b1b] rounded-full mx-auto mb-8 flex items-center justify-center border-4 border-[#9caf9c]/20">
             <img src="https://i.postimg.cc/g0NZcdqH/logo-png.png" alt="" className="w-12 h-12 object-contain" />
@@ -71,7 +77,8 @@ function AdminPage() {
 
   return (
     <>
-      <AdminDashboard onLogout={handleLogout} onShowReport={() => setShowReport(true)} />
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <AdminDashboard onLogout={handleLogout} onShowReport={() => setShowReport(true)} setToast={setToast} />
       {showReport && (
         <div className="fixed inset-0 bg-white z-[100] overflow-auto p-8 print:p-0">
           <div className="max-w-4xl mx-auto">
@@ -103,7 +110,7 @@ function AdminPage() {
   );
 }
 
-function AdminDashboard({ onLogout, onShowReport }: { onLogout: () => void, onShowReport: () => void }) {
+function AdminDashboard({ onLogout, onShowReport, setToast }: { onLogout: () => void, onShowReport: () => void, setToast: any }) {
   const updateOrderStatus = useMutation(api.orders.updateStatus);
   const addProduct = useMutation(api.products.add);
   const respondToRequest = useMutation(api.requests.respond);
@@ -141,9 +148,9 @@ function AdminDashboard({ onLogout, onShowReport }: { onLogout: () => void, onSh
       setOfferDetails("");
       setOfferPrice("");
       setOfferShipping("");
-      alert("Quote transmitted successfully.");
+      setToast({ message: "Quote Transmitted Successfully.", type: "success" });
     } catch (err) {
-      alert("Failed to transmit quote.");
+      setToast({ message: "Transmission Error. Link severed.", type: "error" });
     }
   };
 
@@ -189,10 +196,10 @@ function AdminDashboard({ onLogout, onShowReport }: { onLogout: () => void, onSh
       setNewProductShipping("");
       setNewProductImage("");
       setNewProductStock("1");
-      alert("Product published to inventory.");
+      setToast({ message: "Inventory Payload Manifested.", type: "success" });
     } catch (err: any) {
       console.error("Add Product Error:", err);
-      alert(`Failed to publish product: ${err.message || "Unknown Error"}`);
+      setToast({ message: `Inventory Failure: ${err.message || "Unknown"}`, type: "error" });
     }
   };
 

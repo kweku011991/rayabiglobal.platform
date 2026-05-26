@@ -8,6 +8,7 @@ import { useEffect, useState, useRef } from "react";
 import { getSessionId, formatPrice } from "../lib/utils";
 import type { Id } from "../../convex/_generated/dataModel";
 import { z } from "zod";
+import { Toast, ConfirmModal } from "../components/BrandedUI";
 
 export const Route = createFileRoute("/dashboard")({
   validateSearch: z.object({
@@ -30,6 +31,10 @@ function DashboardPage() {
   const [activeCategory, setActiveCategory] = useState<string>(category || "All");
   const [searchQuery, setSearchQuery] = useState("");
   
+  // Branded UI States
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [confirmData, setConfirmData] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -74,10 +79,10 @@ function DashboardPage() {
       setSelectedImage(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       setIsRequestModalOpen(false);
-      alert("Request submitted successfully!");
+      setToast({ message: "Request Protocol Initiated Successfully!", type: "success" });
     } catch (error) {
       console.error("Upload failed", error);
-      alert("Failed to submit request. Please try again.");
+      setToast({ message: "Request Protocol Failed. Retry.", type: "error" });
     } finally {
       setIsUploading(false);
     }
@@ -85,6 +90,23 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#f3f7f3] pb-20 font-sans text-[#1b2b1b]">
+      {/* Branded Toasts */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      
+      {/* Branded Confirmations */}
+      {confirmData && (
+        <ConfirmModal 
+          title={confirmData.title}
+          message={confirmData.message}
+          confirmLabel="Execute Protocol"
+          onConfirm={() => {
+            confirmData.onConfirm();
+            setConfirmData(null);
+          }}
+          onCancel={() => setConfirmData(null)}
+        />
+      )}
+
       {/* Header - Stable Shell */}
       <header className="bg-white border-b border-[#9caf9c]/20 sticky top-0 z-40">
         <div className="container mx-auto px-6 h-16 flex justify-between items-center">
@@ -153,6 +175,8 @@ function DashboardPage() {
               searchQuery={searchQuery} 
               createOrder={createOrder}
               sessionId={sessionId}
+              setConfirmData={setConfirmData}
+              setToast={setToast}
            />
         </React.Suspense>
 
@@ -161,6 +185,8 @@ function DashboardPage() {
               sessionId={sessionId} 
               createOrder={createOrder} 
               updateRequestStatus={updateRequestStatus} 
+              setConfirmData={setConfirmData}
+              setToast={setToast}
            />
         </React.Suspense>
 
@@ -257,7 +283,7 @@ function DashboardPage() {
 
 // Isolated Sub-components for real-time data
 
-function InventoryGrid({ activeCategory, searchQuery, createOrder, sessionId }: any) {
+function InventoryGrid({ activeCategory, searchQuery, createOrder, sessionId, setConfirmData, setToast }: any) {
   const { data: products } = useSuspenseQuery(convexQuery(api.products.listAll, {}));
   
   const filteredProducts = products.filter(p => {
@@ -269,28 +295,33 @@ function InventoryGrid({ activeCategory, searchQuery, createOrder, sessionId }: 
 
   const handleBuyDirect = async (product: any) => {
     if (product.stock <= 0) {
-      alert("This item is currently out of stock.");
+      setToast({ message: "Item stock exhausted.", type: "error" });
       return;
     }
     
-    const confirmPayment = window.confirm(
-      `Confirm purchase of ${product.productName}?\nTotal: ${formatPrice(product.price + product.shippingCost)}`
-    );
-    if (confirmPayment) {
-      await createOrder({
-        sessionId,
-        source: "direct",
-        productId: product._id,
-        productDetails: {
-          name: product.productName,
-          description: product.description,
-          price: product.price,
-          shippingCost: product.shippingCost,
-        },
-        totalAmount: product.price + product.shippingCost,
-      });
-      alert("Payment successful! Order confirmed.");
-    }
+    setConfirmData({
+      title: "Purchase Authorization",
+      message: `Authorize final procurement of ${product.productName}? Aggregate payload: ${formatPrice(product.price + product.shippingCost)}`,
+      onConfirm: async () => {
+        try {
+          await createOrder({
+            sessionId,
+            source: "direct",
+            productId: product._id,
+            productDetails: {
+              name: product.productName,
+              description: product.description,
+              price: product.price,
+              shippingCost: product.shippingCost,
+            },
+            totalAmount: product.price + product.shippingCost,
+          });
+          setToast({ message: "Transaction Confirmed. Shipment Protocol Active.", type: "success" });
+        } catch (err) {
+          setToast({ message: "Transaction Failed. System Overload.", type: "error" });
+        }
+      }
+    });
   };
 
   if (filteredProducts.length === 0) {
@@ -354,35 +385,49 @@ function InventoryGrid({ activeCategory, searchQuery, createOrder, sessionId }: 
   );
 }
 
-function RequestsSection({ sessionId, createOrder, updateRequestStatus }: any) {
+function RequestsSection({ sessionId, createOrder, updateRequestStatus, setConfirmData, setToast }: any) {
   const { data: myRequests } = useSuspenseQuery(convexQuery(api.requests.listByUser, { sessionId }));
 
   const handleAcceptOffer = async (request: any) => {
     if (!request.adminResponse) return;
-    const confirmPayment = window.confirm(
-      `Confirm payment for ${request.adminResponse.productDetails}?\nTotal: ${formatPrice(request.adminResponse.totalAmount)}`
-    );
-    if (confirmPayment) {
-      await createOrder({
-        sessionId,
-        source: "request",
-        requestId: request._id,
-        productDetails: {
-          name: request.adminResponse.productDetails,
-          description: request.description,
-          price: request.adminResponse.price,
-          shippingCost: request.adminResponse.shippingCost,
-        },
-        totalAmount: request.adminResponse.totalAmount,
-      });
-      alert("Payment successful! Order confirmed.");
-    }
+    setConfirmData({
+      title: "Quote Acceptance",
+      message: `Accept and fulfill quote for ${request.adminResponse.productDetails}? Total: ${formatPrice(request.adminResponse.totalAmount)}`,
+      onConfirm: async () => {
+        try {
+          await createOrder({
+            sessionId,
+            source: "request",
+            requestId: request._id,
+            productDetails: {
+              name: request.adminResponse.productDetails,
+              description: request.description,
+              price: request.adminResponse.price,
+              shippingCost: request.adminResponse.shippingCost,
+            },
+            totalAmount: request.adminResponse.totalAmount,
+          });
+          setToast({ message: "Offer Accepted. Order Synchronized.", type: "success" });
+        } catch (err) {
+          setToast({ message: "Acceptance failed. Connectivity issue.", type: "error" });
+        }
+      }
+    });
   };
 
   const handleDeclineOffer = async (requestId: any) => {
-    if (window.confirm("Are you sure you want to decline this offer? This will close the request.")) {
-      await updateRequestStatus({ requestId, status: "declined" });
-    }
+    setConfirmData({
+      title: "Decline Protocol",
+      message: "Are you sure you want to decline this official offer? This action is irreversible.",
+      onConfirm: async () => {
+        try {
+          await updateRequestStatus({ requestId, status: "declined" });
+          setToast({ message: "Offer declined. Request archived.", type: "info" as any });
+        } catch (err) {
+           setToast({ message: "Failed to decline.", type: "error" });
+        }
+      }
+    });
   };
 
   return (
