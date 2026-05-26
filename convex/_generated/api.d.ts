@@ -10,6 +10,7 @@
 
 import type * as orders from "../orders.js";
 import type * as products from "../products.js";
+import type * as reports from "../reports.js";
 import type * as requests from "../requests.js";
 import type * as sessions from "../sessions.js";
 
@@ -22,6 +23,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   orders: typeof orders;
   products: typeof products;
+  reports: typeof reports;
   requests: typeof requests;
   sessions: typeof sessions;
 }>;

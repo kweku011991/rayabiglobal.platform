@@ -274,15 +274,12 @@ function LandingPage() {
               <h5 className="font-black mb-6 uppercase tracking-widest text-[10px]">Access</h5>
               <div className="space-y-4 text-[#1b2b1b]/50 text-[10px] font-bold uppercase tracking-widest">
                 <Link to="/dashboard" className="block hover:text-[#1b2b1b]">Dashboard</Link>
-                <button 
-                  onClick={() => {
-                    const code = prompt("Admin Passcode:");
-                    if(code === "ADMIN123") window.location.href = "/admin";
-                  }}
+                <Link 
+                  to="/admin"
                   className="hover:text-[#1b2b1b]"
                 >
                   Admin Terminal
-                </button>
+                </Link>
               </div>
             </div>
           </div>
