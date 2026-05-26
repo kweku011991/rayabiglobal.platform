@@ -99,7 +99,7 @@ function LandingPage() {
           </div>
           <div className="hidden md:block md:w-1/2 relative">
              <div className="aspect-square bg-white rounded-3xl overflow-hidden shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-700">
-                <img src="https://images.unsplash.com/photo-1631215539594-576290326ec2?w=800&auto=format&fit=crop" alt="luxury vehicle" className="w-full h-full object-cover grayscale contrast-125" />
+                <img src="https://i.postimg.cc/HWrVFnBQ/IMG-20260523-WA0005-2.jpg" alt="Rayabiglobal Luxury Item" className="w-full h-full object-cover grayscale contrast-125" />
              </div>
           </div>
         </div>
