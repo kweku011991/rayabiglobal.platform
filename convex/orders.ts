@@ -20,10 +20,10 @@ export const create = mutation({
     const orderId = await ctx.db.insert("orders", {
       ...args,
       paymentStatus: "paid", // simplified for mock
-      orderStatus: "ordered_from_supplier",
+      orderStatus: "payment_confirmed",
       trackingUpdates: [
         { status: "Order Confirmed", timestamp: Date.now() },
-        { status: "Ordered from supplier", timestamp: Date.now() },
+        { status: "Payment Confirmed", timestamp: Date.now() },
       ],
       createdAt: Date.now(),
     });
@@ -55,9 +55,11 @@ export const listByUser = query({
       totalAmount: v.number(),
       paymentStatus: v.union(v.literal("paid"), v.literal("pending")),
       orderStatus: v.union(
-        v.literal("ordered_from_supplier"),
+        v.literal("payment_confirmed"),
+        v.literal("sourcing_in_progress"),
+        v.literal("item_received_warehouse"),
         v.literal("shipped_to_ghana"),
-        v.literal("arrived_warehouse"),
+        v.literal("cleared_at_customs"),
         v.literal("out_for_delivery"),
         v.literal("delivered")
       ),
@@ -98,9 +100,11 @@ export const listAll = query({
       totalAmount: v.number(),
       paymentStatus: v.union(v.literal("paid"), v.literal("pending")),
       orderStatus: v.union(
-        v.literal("ordered_from_supplier"),
+        v.literal("payment_confirmed"),
+        v.literal("sourcing_in_progress"),
+        v.literal("item_received_warehouse"),
         v.literal("shipped_to_ghana"),
-        v.literal("arrived_warehouse"),
+        v.literal("cleared_at_customs"),
         v.literal("out_for_delivery"),
         v.literal("delivered")
       ),
@@ -122,9 +126,11 @@ export const updateStatus = mutation({
   args: {
     orderId: v.id("orders"),
     status: v.union(
-      v.literal("ordered_from_supplier"),
+      v.literal("payment_confirmed"),
+      v.literal("sourcing_in_progress"),
+      v.literal("item_received_warehouse"),
       v.literal("shipped_to_ghana"),
-      v.literal("arrived_warehouse"),
+      v.literal("cleared_at_customs"),
       v.literal("out_for_delivery"),
       v.literal("delivered")
     ),
@@ -135,10 +141,12 @@ export const updateStatus = mutation({
     if (!order) throw new Error("Order not found");
 
     const statusMap: Record<string, string> = {
-      ordered_from_supplier: "Ordered from supplier",
+      payment_confirmed: "Payment Confirmed",
+      sourcing_in_progress: "Sourcing in Progress",
+      item_received_warehouse: "Item Received at Warehouse",
       shipped_to_ghana: "Shipped to Ghana",
-      arrived_warehouse: "Arrived at warehouse",
-      out_for_delivery: "Out for delivery",
+      cleared_at_customs: "Cleared at Customs",
+      out_for_delivery: "Out for Delivery",
       delivered: "Delivered",
     };
 

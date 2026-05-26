@@ -35,10 +35,20 @@ export default defineSchema({
   directProducts: defineTable({
     productName: v.string(),
     description: v.string(),
+    category: v.union(
+      v.literal("Watch"),
+      v.literal("Bag"),
+      v.literal("E-bike"),
+      v.literal("Motorbike"),
+      v.literal("Car"),
+      v.literal("Other")
+    ),
+    stock: v.number(),
     pictureUrl: v.string(),
     year: v.optional(v.string()),
     condition: v.optional(v.string()),
     serialNumber: v.optional(v.string()),
+    mileage: v.optional(v.string()),
     price: v.number(),
     shippingCost: v.number(),
     warehouseLocation: v.union(v.literal("Local"), v.literal("Abroad")),
@@ -59,9 +69,11 @@ export default defineSchema({
     totalAmount: v.number(),
     paymentStatus: v.union(v.literal("paid"), v.literal("pending")),
     orderStatus: v.union(
-      v.literal("ordered_from_supplier"),
+      v.literal("payment_confirmed"),
+      v.literal("sourcing_in_progress"),
+      v.literal("item_received_warehouse"),
       v.literal("shipped_to_ghana"),
-      v.literal("arrived_warehouse"),
+      v.literal("cleared_at_customs"),
       v.literal("out_for_delivery"),
       v.literal("delivered")
     ),
