@@ -203,9 +203,9 @@ function LandingPage() {
                 text: "We use them for our company mobility needs. Direct sourcing from UK saved us nearly 20% on landing costs." 
               }
             ].map((item, i) => (
-              <div key={i} className="bg-white p-12 rounded-2xl border border-[#9caf9c]/10 shadow-sm relative group">
+              <div key={i} className="bg-white p-10 rounded-2xl border border-[#9caf9c]/10 shadow-sm relative group aspect-square flex flex-col justify-center">
                 <div className="text-4xl text-[#9caf9c]/20 absolute top-8 right-8 font-serif italic">"</div>
-                <p className="text-[#1b2b1b]/70 italic mb-8 font-medium relative z-10 leading-relaxed">
+                <p className="text-[#1b2b1b]/70 italic mb-8 font-medium relative z-10 leading-relaxed text-sm md:text-base">
                   {item.text}
                 </p>
                 <div className="flex items-center gap-4">
