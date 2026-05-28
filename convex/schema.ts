@@ -44,7 +44,8 @@ export default defineSchema({
       v.literal("Other")
     ),
     stock: v.number(),
-    pictureUrl: v.string(),
+    pictureUrl: v.optional(v.string()), // For legacy/external URLs
+    storageId: v.optional(v.id("_storage")), // For uploaded images
     year: v.optional(v.string()),
     condition: v.optional(v.string()),
     serialNumber: v.optional(v.string()),

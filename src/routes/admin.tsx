@@ -4,9 +4,10 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { formatPrice } from "../lib/utils";
 import { Toast, ConfirmModal } from "../components/BrandedUI";
+import type { Id } from "../../convex/_generated/dataModel";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -133,6 +134,11 @@ function AdminDashboard({ onLogout, onShowReport, setToast }: { onLogout: () => 
   const [newProductShipping, setNewProductShipping] = useState("");
   const [newProductLocation, setNewProductLocation] = useState<"Local" | "Abroad">("Abroad");
   const [newProductImage, setNewProductImage] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const generateUploadUrl = useMutation(api.requests.generateUploadUrl);
 
   const handleRespond = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,12 +162,7 @@ function AdminDashboard({ onLogout, onShowReport, setToast }: { onLogout: () => 
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Attempting to add product:", {
-      productName: newProductName,
-      price: newProductPrice,
-      shipping: newProductShipping,
-      stock: newProductStock
-    });
+    setIsUploading(true);
     
     try {
       const priceVal = Number(newProductPrice);
@@ -170,6 +171,19 @@ function AdminDashboard({ onLogout, onShowReport, setToast }: { onLogout: () => 
 
       if (isNaN(priceVal) || isNaN(shippingVal) || isNaN(stockVal)) {
         throw new Error("Price, Shipping, and Stock must be valid numbers.");
+      }
+
+      let storageId: Id<"_storage"> | undefined;
+
+      if (selectedFile) {
+        const postUrl = await generateUploadUrl();
+        const result = await fetch(postUrl, {
+          method: "POST",
+          headers: { "Content-Type": selectedFile.type },
+          body: selectedFile,
+        });
+        const json = await result.json();
+        storageId = json.storageId as Id<"_storage">;
       }
 
       await addProduct({
@@ -184,7 +198,8 @@ function AdminDashboard({ onLogout, onShowReport, setToast }: { onLogout: () => 
         price: priceVal,
         shippingCost: shippingVal,
         warehouseLocation: newProductLocation,
-        pictureUrl: newProductImage || "https://images.unsplash.com/photo-1585123334904-845d60e97b29?w=400&auto=format&fit=crop", // Default placeholder if empty
+        pictureUrl: newProductImage || undefined,
+        storageId,
       });
       setNewProductName("");
       setNewProductDesc("");
@@ -196,10 +211,14 @@ function AdminDashboard({ onLogout, onShowReport, setToast }: { onLogout: () => 
       setNewProductShipping("");
       setNewProductImage("");
       setNewProductStock("1");
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       setToast({ message: "Inventory Payload Manifested.", type: "success" });
     } catch (err: any) {
       console.error("Add Product Error:", err);
       setToast({ message: `Inventory Failure: ${err.message || "Unknown"}`, type: "error" });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -371,14 +390,55 @@ function AdminDashboard({ onLogout, onShowReport, setToast }: { onLogout: () => 
                   <option value="Local">Local Warehouse</option>
                   <option value="Abroad">Source Abroad</option>
                 </select>
-                <input 
-                  type="url" 
-                  placeholder="Image URL" 
-                  className="w-full bg-[#f3f7f3] rounded-sm p-4 text-xs font-bold uppercase tracking-widest outline-none border-2 border-transparent focus:border-[#9caf9c] transition-all"
-                  value={newProductImage}
-                  onChange={(e) => setNewProductImage(e.target.value)}
-                />
-                <button type="submit" className="w-full bg-[#1b2b1b] text-white py-4 rounded-sm font-black text-[10px] uppercase tracking-[0.3em] hover:bg-[#9caf9c] transition-all">Publish Item</button>
+
+                <div className="space-y-4">
+                   <label className="block text-[10px] font-black text-[#9caf9c] uppercase tracking-widest mb-1">Product Media</label>
+                   <div className="grid grid-cols-1 gap-4">
+                      <div className="relative group">
+                         <input 
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                          className="hidden"
+                          accept="image/*"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full border-2 border-dashed border-[#9caf9c]/30 rounded-sm p-6 text-center hover:border-[#9caf9c] transition-all bg-[#f3f7f3]/50 group-hover:bg-white"
+                        >
+                          {selectedFile ? (
+                            <div className="flex items-center justify-center gap-2 text-[#1b2b1b] font-bold uppercase text-[8px]">
+                              <span className="truncate max-w-[150px]">{selectedFile.name}</span>
+                              <span className="text-[#9caf9c]">Change</span>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <p className="text-[#1b2b1b] font-black uppercase text-[8px] tracking-widest">Select Product Photo</p>
+                              <p className="text-[#9caf9c] font-bold text-[6px] uppercase tracking-widest">Local High-Fidelity Asset</p>
+                            </div>
+                          )}
+                        </button>
+                      </div>
+                      <div className="relative">
+                         <input 
+                          type="url" 
+                          placeholder="Or Paste Remote Image URL" 
+                          className="w-full bg-[#f3f7f3] rounded-sm p-4 text-[10px] font-bold uppercase tracking-widest outline-none border-2 border-transparent focus:border-[#9caf9c] transition-all"
+                          value={newProductImage}
+                          onChange={(e) => setNewProductImage(e.target.value)}
+                        />
+                      </div>
+                   </div>
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={isUploading}
+                  className={`w-full bg-[#1b2b1b] text-white py-4 rounded-sm font-black text-[10px] uppercase tracking-[0.3em] hover:bg-[#9caf9c] transition-all ${isUploading ? 'opacity-50 cursor-not-allowed animate-pulse' : ''}`}
+                >
+                  {isUploading ? 'Syncing Protocol...' : 'Publish Item'}
+                </button>
               </form>
             </div>
 

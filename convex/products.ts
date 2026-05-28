@@ -27,10 +27,22 @@ export const listAll = query({
       shippingCost: v.number(),
       warehouseLocation: v.union(v.literal("Local"), v.literal("Abroad")),
       createdAt: v.number(),
+      storageId: v.optional(v.id("_storage")),
     })
   ),
   handler: async (ctx) => {
-    return await ctx.db.query("directProducts").order("desc").collect();
+    const products = await ctx.db.query("directProducts").order("desc").collect();
+    return await Promise.all(
+      products.map(async (p) => {
+        const pictureUrl = p.storageId
+          ? await ctx.storage.getUrl(p.storageId)
+          : p.pictureUrl;
+        return {
+          ...p,
+          pictureUrl: pictureUrl || "https://images.unsplash.com/photo-1585123334904-845d60e97b29?w=400&auto=format&fit=crop",
+        };
+      })
+    );
   },
 });
 
@@ -47,7 +59,8 @@ export const add = mutation({
       v.literal("Other")
     ),
     stock: v.number(),
-    pictureUrl: v.string(),
+    pictureUrl: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
     year: v.optional(v.string()),
     condition: v.optional(v.string()),
     serialNumber: v.optional(v.string()),
