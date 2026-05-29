@@ -54,6 +54,11 @@ export default defineSchema({
     shippingCost: v.number(),
     warehouseLocation: v.union(v.literal("Local"), v.literal("Abroad")),
     createdAt: v.number(),
+  })
+  .index("by_category", ["category"])
+  .searchIndex("search_products", {
+    searchField: "productName",
+    filterFields: ["category"],
   }),
 
   orders: defineTable({

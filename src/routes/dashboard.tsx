@@ -284,15 +284,10 @@ function DashboardPage() {
 // Isolated Sub-components for real-time data
 
 function InventoryGrid({ activeCategory, searchQuery, createOrder, sessionId, setConfirmData, setToast }: any) {
-  const { data: products } = useSuspenseQuery(convexQuery(api.products.listAll, {}));
+  const { data: filteredProducts } = useSuspenseQuery(
+    convexQuery(api.products.search, { query: searchQuery, category: activeCategory })
+  );
   
-  const filteredProducts = products.filter(p => {
-    const matchesCategory = activeCategory === "All" || p.category === activeCategory;
-    const matchesSearch = p.productName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         p.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
-
   const handleBuyDirect = async (product: any) => {
     if (product.stock <= 0) {
       setToast({ message: "Item stock exhausted.", type: "error" });

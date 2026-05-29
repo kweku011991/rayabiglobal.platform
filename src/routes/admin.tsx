@@ -20,6 +20,7 @@ function AdminPage() {
   
   // Branded UI States
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [confirmData, setConfirmData] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
     const auth = sessionStorage.getItem("admin_auth");
@@ -79,7 +80,27 @@ function AdminPage() {
   return (
     <>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      <AdminDashboard onLogout={handleLogout} onShowReport={() => setShowReport(true)} setToast={setToast} />
+      
+      {/* Branded Confirmations */}
+      {confirmData && (
+        <ConfirmModal 
+          title={confirmData.title}
+          message={confirmData.message}
+          confirmLabel="Execute Protocol"
+          onConfirm={() => {
+            confirmData.onConfirm();
+            setConfirmData(null);
+          }}
+          onCancel={() => setConfirmData(null)}
+        />
+      )}
+
+      <AdminDashboard 
+        onLogout={handleLogout} 
+        onShowReport={() => setShowReport(true)} 
+        setToast={setToast} 
+        setConfirmData={setConfirmData} 
+      />
       {showReport && (
         <div className="fixed inset-0 bg-white z-[100] overflow-auto p-8 print:p-0">
           <div className="max-w-4xl mx-auto">
@@ -111,7 +132,7 @@ function AdminPage() {
   );
 }
 
-function AdminDashboard({ onLogout, onShowReport, setToast }: { onLogout: () => void, onShowReport: () => void, setToast: any }) {
+function AdminDashboard({ onLogout, onShowReport, setToast, setConfirmData }: { onLogout: () => void, onShowReport: () => void, setToast: any, setConfirmData: any }) {
   const updateOrderStatus = useMutation(api.orders.updateStatus);
   const addProduct = useMutation(api.products.add);
   const respondToRequest = useMutation(api.requests.respond);
@@ -274,7 +295,7 @@ function AdminDashboard({ onLogout, onShowReport, setToast }: { onLogout: () => 
               Logistics
             </h2>
             <React.Suspense fallback={<div className="h-64 bg-white/50 rounded-2xl animate-pulse"></div>}>
-               <OrdersList onUpdateStatus={updateOrderStatus} />
+               <OrdersList onUpdateStatus={updateOrderStatus} setConfirmData={setConfirmData} setToast={setToast} />
             </React.Suspense>
           </section>
         </div>
@@ -446,7 +467,7 @@ function AdminDashboard({ onLogout, onShowReport, setToast }: { onLogout: () => 
             <div className="lg:col-span-2 space-y-6">
               <h3 className="text-lg font-black text-[#1b2b1b] mb-4 uppercase tracking-widest">Active Inventory</h3>
               <React.Suspense fallback={<div className="grid grid-cols-2 gap-6 animate-pulse"><div className="h-32 bg-white/50 rounded-2xl"></div><div className="h-32 bg-white/50 rounded-2xl"></div></div>}>
-                 <InventoryList />
+                 <InventoryList setConfirmData={setConfirmData} setToast={setToast} />
               </React.Suspense>
             </div>
           </div>
@@ -500,7 +521,7 @@ function AdminDashboard({ onLogout, onShowReport, setToast }: { onLogout: () => 
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -613,9 +634,9 @@ function RequestsList({ onPrepareQuote }: { onPrepareQuote: (id: string) => void
       {requests.map((req: any) => (
         <div key={req._id} className="bg-white p-8 rounded-2xl border border-[#9caf9c]/10 shadow-sm flex flex-col md:flex-row gap-6">
           {req.pictureUrl && (
-             <div className="w-full md:w-24 h-24 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 border border-[#9caf9c]/10">
-                <img src={req.pictureUrl} alt="" className="w-full h-full object-cover" />
-             </div>
+            <div className="w-full md:w-24 h-24 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 border border-[#9caf9c]/10">
+              <img src={req.pictureUrl} alt="" className="w-full h-full object-cover" />
+            </div>
           )}
           <div className="flex-1">
             <div className="flex justify-between items-start mb-4">
@@ -653,8 +674,24 @@ function RequestsList({ onPrepareQuote }: { onPrepareQuote: (id: string) => void
   );
 }
 
-function OrdersList({ onUpdateStatus }: { onUpdateStatus: any }) {
+function OrdersList({ onUpdateStatus, setConfirmData, setToast }: { onUpdateStatus: any, setConfirmData: any, setToast: any }) {
   const { data: orders } = useSuspenseQuery(convexQuery(api.orders.listAll, {}));
+  const confirmPayment = useMutation(api.orders.confirmPayment);
+
+  const handleConfirmPayment = (orderId: Id<"orders">, name: string) => {
+    setConfirmData({
+      title: "Financial Protocol",
+      message: `Confirm that funds for ${name} have been received and verified?`,
+      onConfirm: async () => {
+        try {
+          await confirmPayment({ orderId });
+          setToast({ message: "Payment Verified. Logistics Activated.", type: "success" });
+        } catch (err) {
+          setToast({ message: "Verification Failure.", type: "error" });
+        }
+      }
+    });
+  };
   
   if (orders.length === 0) return <p className="text-[#9caf9c] font-bold uppercase text-[10px]">Zero active shipments.</p>;
   
@@ -662,13 +699,29 @@ function OrdersList({ onUpdateStatus }: { onUpdateStatus: any }) {
     <div className="space-y-4">
       {orders.map((order: any) => (
         <div key={order._id} className="bg-white p-8 rounded-2xl border border-[#9caf9c]/10 shadow-sm">
-          <div className="flex justify-between items-center mb-6 pb-6 border-b border-[#f3f7f3]">
+          <div className="flex justify-between items-start mb-6 pb-6 border-b border-[#f3f7f3]">
             <div className="space-y-1">
               <p className="text-[10px] font-black text-[#9caf9c] uppercase tracking-widest">Order Payload</p>
               <h4 className="text-[#1b2b1b] font-black uppercase tracking-tight">{order.productDetails.name}</h4>
+              <div className="flex items-center gap-2 mt-2">
+                 <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
+                   order.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                 }`}>
+                   Payment: {order.paymentStatus}
+                 </span>
+                 <span className="text-[8px] font-bold text-[#9caf9c] uppercase tracking-widest">Source: {order.source}</span>
+              </div>
             </div>
             <div className="text-right">
               <p className="text-lg font-black text-[#1b2b1b]">{formatPrice(order.totalAmount)}</p>
+              {order.paymentStatus === 'pending' && (
+                <button 
+                  onClick={() => handleConfirmPayment(order._id, order.productDetails.name)}
+                  className="mt-2 bg-[#1b2b1b] text-[#9caf9c] px-4 py-1.5 rounded-sm font-black text-[8px] uppercase tracking-widest hover:bg-[#9caf9c] hover:text-white transition-all shadow-sm"
+                >
+                  Verify Payment
+                </button>
+              )}
             </div>
           </div>
           
@@ -694,13 +747,38 @@ function OrdersList({ onUpdateStatus }: { onUpdateStatus: any }) {
   );
 }
 
-function InventoryList() {
+function InventoryList({ setConfirmData, setToast }: { setConfirmData: any, setToast: any }) {
   const { data: products } = useSuspenseQuery(convexQuery(api.products.listAll, {}));
+  const removeProduct = useMutation(api.products.remove);
+
+  const handleDelete = (productId: Id<"directProducts">, name: string) => {
+    setConfirmData({
+      title: "Decommission Protocol",
+      message: `Permanently terminate inventory payload for ${name}? This action is irreversible.`,
+      onConfirm: async () => {
+        try {
+          await removeProduct({ productId });
+          setToast({ message: "Payload Decommissioned Successfully.", type: "success" });
+        } catch (err) {
+          setToast({ message: "Protocol Interrupted. Decommission Failed.", type: "error" });
+        }
+      }
+    });
+  };
   
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {products.map((p: any) => (
-        <div key={p._id} className="bg-white p-6 rounded-2xl border border-[#9caf9c]/10 shadow-sm flex gap-6 items-center">
+        <div key={p._id} className="bg-white p-6 rounded-2xl border border-[#9caf9c]/10 shadow-sm flex gap-6 items-center group relative">
+          <button 
+            onClick={() => handleDelete(p._id, p.productName)}
+            className="absolute top-2 right-2 p-2 bg-red-50 text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white shadow-sm"
+            title="Decommission Item"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
           <div className="w-24 h-24 bg-[#f3f7f3] rounded-xl overflow-hidden shrink-0 border border-[#9caf9c]/10 relative">
             {p.pictureUrl && <img src={p.pictureUrl} alt="" className="w-full h-full object-cover" />}
             <span className="absolute top-1 left-1 bg-[#1b2b1b] text-[#9caf9c] text-[6px] px-1 font-black rounded-xs">{p.category}</span>

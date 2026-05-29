@@ -19,11 +19,10 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const orderId = await ctx.db.insert("orders", {
       ...args,
-      paymentStatus: "paid", // simplified for mock
+      paymentStatus: "pending",
       orderStatus: "payment_confirmed",
       trackingUpdates: [
-        { status: "Order Confirmed", timestamp: Date.now() },
-        { status: "Payment Confirmed", timestamp: Date.now() },
+        { status: "Order Manifested", timestamp: Date.now() },
       ],
       createdAt: Date.now(),
     });
@@ -157,6 +156,26 @@ export const updateStatus = mutation({
 
     await ctx.db.patch(args.orderId, {
       orderStatus: args.status,
+      trackingUpdates: [...order.trackingUpdates, newUpdate],
+    });
+    return null;
+  },
+});
+
+export const confirmPayment = mutation({
+  args: { orderId: v.id("orders") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderId);
+    if (!order) throw new Error("Order not found");
+
+    const newUpdate = {
+      status: "Payment Confirmed",
+      timestamp: Date.now(),
+    };
+
+    await ctx.db.patch(args.orderId, {
+      paymentStatus: "paid",
       trackingUpdates: [...order.trackingUpdates, newUpdate],
     });
     return null;
